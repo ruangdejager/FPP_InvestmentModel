@@ -1,6 +1,8 @@
 import {
   buildVerdict,
+  capitalGainsTaxProvision,
   compareAssetClasses,
+  computeSetupCosts,
   runProjection,
   solveMaximumPrice,
   solveMinimumDeposit,
@@ -110,6 +112,80 @@ export async function verdictRoutes(app: FastifyInstance): Promise<void> {
         scenario: bundle.scenario,
         confidence: assumptionConfidence(id),
       };
+    } catch (error) {
+      return reply.status(400).send({ error: (error as Error).message });
+    }
+  });
+
+  /**
+   * A month by month wealth series for the two legs.
+   *
+   * The horizon snapshots give four points; the chart needs the shape between
+   * them. Both legs are built the same way they are at a horizon: the ETF gets
+   * the initial cash and every shortfall on the month it falls, and the property
+   * carries its exit costs even though the directors never sell.
+   */
+  app.get('/api/scenarios/:id/wealth', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      const bundle = buildScenarioInput(id);
+      const projection = runProjection(bundle.input);
+      const setup = computeSetupCosts(bundle.input);
+      const exit = bundle.input.exit;
+
+      const legs = bundle.hurdleRates.map((hurdleRate) => ({
+        hurdleRate,
+        factor: Math.pow(1 + hurdleRate, 1 / 12),
+        etfBalance: setup.initialCashIn,
+        etfContributions: setup.initialCashIn,
+        fundBalance: 0,
+        fundContributions: 0,
+      }));
+
+      const series = projection.months.map((month) => {
+        const commissionBase = Math.round(month.propertyValue * exit.agentCommissionPct);
+        const agentCommission = exit.agentCommissionVatApplies
+          ? Math.round(commissionBase * (1 + exit.vatRate))
+          : commissionBase;
+        const propertyCgt = capitalGainsTaxProvision(
+          month.propertyValue - agentCommission,
+          setup.cgtBaseCost,
+          bundle.input.tax,
+        );
+        const surplusIn = month.surplus + (month.refinance ? Math.max(0, month.refinance.releaseNet) : 0);
+
+        const byHurdle = legs.map((leg) => {
+          leg.etfBalance = Math.round(leg.etfBalance * leg.factor) + month.cashRequired;
+          leg.etfContributions += month.cashRequired;
+          leg.fundBalance = Math.round(leg.fundBalance * leg.factor) + surplusIn;
+          leg.fundContributions += surplusIn;
+
+          const etfCgt = capitalGainsTaxProvision(leg.etfBalance, leg.etfContributions, bundle.input.tax);
+          const fundCgt = capitalGainsTaxProvision(leg.fundBalance, leg.fundContributions, bundle.input.tax);
+          return {
+            hurdleRate: leg.hurdleRate,
+            etfNetValue: leg.etfBalance - etfCgt,
+            propertyNetEquity:
+              month.propertyValue -
+              agentCommission -
+              month.bondClosingBalance -
+              propertyCgt +
+              leg.fundBalance -
+              fundCgt,
+          };
+        });
+
+        return {
+          monthIndex: month.monthIndex,
+          propertyValue: month.propertyValue,
+          bondBalance: month.bondClosingBalance,
+          cumulativeCashIn: month.cumulativeCashIn,
+          realDeflator: month.realDeflator,
+          byHurdle,
+        };
+      });
+
+      return { series, hurdleRates: bundle.hurdleRates, primaryHurdleRate: bundle.primaryHurdleRate };
     } catch (error) {
       return reply.status(400).send({ error: (error as Error).message });
     }

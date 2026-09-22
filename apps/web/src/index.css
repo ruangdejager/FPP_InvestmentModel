@@ -1,0 +1,53 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-ink: #10192b;
+  --color-ink-soft: #46536b;
+  --color-line: #dfe4ec;
+  --color-surface: #ffffff;
+  --color-canvas: #f4f6fa;
+
+  --color-pass: #0f7b52;
+  --color-pass-soft: #e6f4ee;
+  --color-caution: #a16207;
+  --color-caution-soft: #fdf4e3;
+  --color-fail: #b42318;
+  --color-fail-soft: #fdeceb;
+  --color-accent: #1f4b99;
+  --color-accent-soft: #eaf0fb;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Financial grids read better with tabular figures. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/**
+ * Print styles exist so a deal can be circulated to five directors before a
+ * decision. The browser's own print-to-PDF is the export.
+ */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .print-block {
+    break-inside: avoid;
+  }
+  main {
+    padding: 0 !important;
+  }
+}

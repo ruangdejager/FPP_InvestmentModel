@@ -4,7 +4,7 @@ import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
-import { ensureDirectories, HOST, IS_PRODUCTION, PORT } from './config.js';
+import { ensureDirectories, HOST, NODE_ENV, PORT } from './config.js';
 import { runMigrations } from './db/migrate.js';
 import { authHook } from './lib/auth.js';
 import { isMainModule } from './lib/is-main.js';
@@ -23,7 +23,8 @@ export async function buildServer() {
   runMigrations();
 
   const app = Fastify({
-    logger: IS_PRODUCTION ? true : { transport: undefined },
+    // Quiet under test; request logs are noise there and useful everywhere else.
+    logger: NODE_ENV !== 'test',
     bodyLimit: 10 * 1024 * 1024,
   });
 
