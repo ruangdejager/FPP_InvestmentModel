@@ -1,0 +1,21 @@
+{
+  "name": "@fp/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run --project engine",
+    "golden:update": "UPDATE_GOLDEN=1 vitest run --project engine test/golden.test.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
